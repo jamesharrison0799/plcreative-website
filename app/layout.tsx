@@ -39,7 +39,7 @@ export default function RootLayout({
       className={`${geistSans.variable} ${geistMono.variable} h-full antialiased`}
     >
       <body className="min-h-full flex flex-col">
-        <header className="fixed top-0 right-0 p-4 z-10">
+        <header className="fixed top-0 right-0 z-[100] p-4 pointer-events-auto">
           <AuthControls />
         </header>
         {children}
