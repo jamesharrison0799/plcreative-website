@@ -75,15 +75,23 @@ export default async function AdminPage() {
         <div className="space-y-6">
           <section className="border border-foreground/10 p-5">
             <h2 className="text-sm">Links</h2>
-            <p className="mt-2 text-xs text-foreground/50">View your links page</p>
-            <Link
-              href="/links"
-              target="_blank"
-              rel="noopener noreferrer"
-              className="mt-3 block border border-foreground/10 px-4 py-2 text-sm text-center hover:bg-foreground/5"
-            >
-              View links
-            </Link>
+            <p className="mt-2 text-xs text-foreground/50">Manage and view your links page</p>
+            <div className="mt-3 flex gap-2">
+              <Link
+                href="/admin/links"
+                className="flex-1 border border-foreground/10 px-4 py-2 text-sm text-center hover:bg-foreground/5"
+              >
+                Manage
+              </Link>
+              <Link
+                href="/links"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="flex-1 border border-foreground/10 px-4 py-2 text-sm text-center hover:bg-foreground/5"
+              >
+                View
+              </Link>
+            </div>
           </section>
 
           <section className="border border-foreground/10 p-5">

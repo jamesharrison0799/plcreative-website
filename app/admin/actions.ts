@@ -509,3 +509,83 @@ export async function sendResendCampaignAction(
     message: `Sent campaign to ${sentCount} subscriber${sentCount === 1 ? '' : 's'}.`,
   }
 }
+
+export async function createLinkAction(formData: FormData) {
+  const { supabase } = await requireAdmin()
+
+  const url = String(formData.get('url') ?? '').trim()
+  const title = String(formData.get('title') ?? '').trim()
+  const description = String(formData.get('description') ?? '').trim()
+
+  if (!url || !title) {
+    return
+  }
+
+  await supabase.from('links').insert({
+    url,
+    title,
+    description,
+    order_index: 0,
+    updated_at: new Date().toISOString(),
+  })
+
+  revalidatePath('/admin/links')
+  revalidatePath('/links')
+}
+
+export async function updateLinkAction(formData: FormData) {
+  const { supabase } = await requireAdmin()
+
+  const id = String(formData.get('id') ?? '')
+  const url = String(formData.get('url') ?? '').trim()
+  const title = String(formData.get('title') ?? '').trim()
+  const description = String(formData.get('description') ?? '').trim()
+
+  if (!id || !url || !title) {
+    return
+  }
+
+  await supabase
+    .from('links')
+    .update({
+      url,
+      title,
+      description,
+      updated_at: new Date().toISOString(),
+    })
+    .eq('id', id)
+
+  revalidatePath('/admin/links')
+  revalidatePath('/links')
+}
+
+export async function deleteLinkAction(formData: FormData) {
+  const { supabase } = await requireAdmin()
+
+  const id = String(formData.get('id') ?? '')
+
+  if (!id) {
+    return
+  }
+
+  await supabase.from('links').delete().eq('id', id)
+
+  revalidatePath('/admin/links')
+  revalidatePath('/links')
+}
+
+export async function reorderLinksAction(formData: FormData) {
+  const { supabase } = await requireAdmin()
+
+  const items = JSON.parse(String(formData.get('items') ?? '[]'))
+
+  for (let i = 0; i < items.length; i++) {
+    await supabase
+      .from('links')
+      .update({ order_index: i })
+      .eq('id', items[i].id)
+  }
+
+  revalidatePath('/admin/links')
+  revalidatePath('/links')
+}
