@@ -8,11 +8,11 @@ export async function proxy(request: NextRequest) {
   // Handles: links.localhost:3000, links.domain.com, etc.
   const subdomain = host.split('.')[0]
 
-  // If subdomain is 'links', rewrite to /links route
+  // If subdomain is 'links', redirect to /links route
   if (subdomain === 'links' && !request.nextUrl.pathname.startsWith('/links')) {
     const url = request.nextUrl.clone()
     url.pathname = `/links${url.pathname}`
-    return NextResponse.rewrite(url)
+    return NextResponse.redirect(url)
   }
 
   let supabaseResponse = NextResponse.next({ request })
