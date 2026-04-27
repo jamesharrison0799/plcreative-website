@@ -2,6 +2,7 @@ import ReactMarkdown from 'react-markdown'
 import type { CmsSectionRecord } from '@/lib/cms'
 import { getTextValue } from '@/lib/cms'
 import Link from 'next/link'
+import NewsletterSignupForm from '@/components/NewsletterSignupForm'
 
 function MarkdownBody({ text }: { text: string }) {
   return (
@@ -280,6 +281,28 @@ export default function CmsPageRenderer({
                     {buttonText}
                   </Link>
                 ) : null}
+              </div>
+            </section>
+          )
+        }
+
+        if (section.type === 'newsletter') {
+          const heading = getTextValue(section.data, 'heading')
+          const body = getTextValue(section.data, 'body')
+          const buttonText = getTextValue(section.data, 'button_text')
+
+          return (
+            <section key={section.id} className="px-6 py-20">
+              <div className="mx-auto max-w-xl text-center">
+                {heading ? <h2 className="text-base font-medium">{heading}</h2> : null}
+                {body ? (
+                  <div className="mt-3 text-sm text-foreground/60 leading-7">
+                    <MarkdownBody text={body} />
+                  </div>
+                ) : null}
+                <div className="mt-6">
+                  <NewsletterSignupForm buttonLabel={buttonText || 'Subscribe'} source="cms-newsletter-section" />
+                </div>
               </div>
             </section>
           )

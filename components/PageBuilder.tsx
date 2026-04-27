@@ -353,6 +353,34 @@ function SectionPreview({ type, edit }: { type: string; edit: EditState }) {
     )
   }
 
+  if (type === 'newsletter') {
+    return (
+      <div className="px-10 py-20 text-center">
+        <div className="mx-auto max-w-xl">
+          {edit.heading && <h2 className="text-xl font-light">{edit.heading}</h2>}
+          {edit.body && (
+            <div className="mt-3 text-sm leading-7 text-foreground/60">
+              <MD text={edit.body} />
+            </div>
+          )}
+          <div className="mt-7 mx-auto max-w-md border border-foreground/15 p-4">
+            <div className="grid grid-cols-1 gap-2 sm:grid-cols-[1fr_auto]">
+              <input
+                type="email"
+                readOnly
+                value="email@example.com"
+                className="border border-foreground/20 bg-background px-3 py-2 text-sm"
+              />
+              <span className="inline-flex items-center justify-center border border-foreground/25 px-4 py-2 text-sm">
+                {edit.button_text || 'Subscribe'}
+              </span>
+            </div>
+          </div>
+        </div>
+      </div>
+    )
+  }
+
   if (type === 'image') {
     return (
       <div className="px-10 py-14">
@@ -447,10 +475,11 @@ function EditForm({
   const titleImageInputRef = useRef<HTMLInputElement>(null)
   const backgroundInputRef = useRef<HTMLInputElement>(null)
   const logoInputRef = useRef<HTMLInputElement>(null)
-  const needsBody = ['hero', 'text', 'cta'].includes(section.type)
+  const needsBody = ['hero', 'text', 'cta', 'newsletter'].includes(section.type)
   const isHero = section.type === 'hero'
   const isHeroMedia = section.type === 'hero_media'
   const isCta = section.type === 'cta'
+  const isNewsletter = section.type === 'newsletter'
   const isImage = section.type === 'image'
   const isComplex = section.type === 'faq' || section.type === 'testimonials'
 
@@ -630,16 +659,18 @@ function EditForm({
           </>
         )}
 
-        {isCta && (
+        {(isCta || isNewsletter) && (
           <>
             <label className="flex flex-col gap-1">
               <span className="text-xs text-foreground/40">Button label</span>
               <input value={edit.button_text} onChange={(e) => onChange({ button_text: e.target.value })} className={inp} />
             </label>
-            <label className="flex flex-col gap-1">
-              <span className="text-xs text-foreground/40">Button URL</span>
-              <input value={edit.button_url} onChange={(e) => onChange({ button_url: e.target.value })} className={inp} />
-            </label>
+            {isCta ? (
+              <label className="flex flex-col gap-1">
+                <span className="text-xs text-foreground/40">Button URL</span>
+                <input value={edit.button_url} onChange={(e) => onChange({ button_url: e.target.value })} className={inp} />
+              </label>
+            ) : null}
           </>
         )}
 
@@ -932,7 +963,7 @@ function SortableCard(props: Parameters<typeof SortableListCard>[0] & { sectionI
 
 // ─── Main PageBuilder ─────────────────────────────────────────────────────────
 
-const SECTION_TYPES = ['text', 'hero', 'cta', 'image', 'faq', 'testimonials'] as const
+const SECTION_TYPES = ['text', 'hero', 'cta', 'newsletter', 'image', 'faq', 'testimonials'] as const
 const SECTION_TYPES_EXTENDED = ['hero_media', ...SECTION_TYPES] as const
 
 interface Props {

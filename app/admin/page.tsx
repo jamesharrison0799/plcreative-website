@@ -5,10 +5,15 @@ import { getPagesIndex, getSiteSettings } from '@/lib/cms'
 
 export default async function AdminPage() {
   const { supabase } = await requireAdmin()
-  const [pages, siteSettings] = await Promise.all([
+  const [pages, siteSettings, subscribersCountRes] = await Promise.all([
     getPagesIndex(supabase),
     getSiteSettings(supabase),
+    supabase
+      .from('mailing_list_subscribers')
+      .select('id', { head: true, count: 'exact' })
+      .eq('status', 'subscribed'),
   ])
+  const subscribersCount = subscribersCountRes.count ?? 0
 
   return (
     <div className="space-y-10">
@@ -30,8 +35,8 @@ export default async function AdminPage() {
           <p className="mt-2 text-lg">{pages.filter((page) => page.status === 'published').length}</p>
         </div>
         <div className="border border-foreground/10 p-4">
-          <p className="text-xs text-foreground/40">Sections</p>
-          <p className="mt-2 text-lg">Structured builder</p>
+          <p className="text-xs text-foreground/40">Mailing list</p>
+          <p className="mt-2 text-lg">{subscribersCount}</p>
         </div>
       </section>
 
@@ -68,6 +73,19 @@ export default async function AdminPage() {
         </div>
 
         <div className="space-y-6">
+          <section className="border border-foreground/10 p-5">
+            <h2 className="text-sm">Links</h2>
+            <p className="mt-2 text-xs text-foreground/50">View your links page</p>
+            <Link
+              href="http://links.localhost:3000"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="mt-3 block border border-foreground/10 px-4 py-2 text-sm text-center hover:bg-foreground/5"
+            >
+              View links
+            </Link>
+          </section>
+
           <section className="border border-foreground/10 p-5">
             <h2 className="text-sm">Create page</h2>
             <form action={createPageAction} className="mt-4 space-y-3">
@@ -124,6 +142,7 @@ export default async function AdminPage() {
               </button>
             </form>
           </section>
+
         </div>
       </section>
     </div>

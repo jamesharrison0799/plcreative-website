@@ -33,6 +33,9 @@ export default async function AdminLayout({
             <Link href="/admin/media" className="border border-foreground/10 px-3 py-2 hover:bg-foreground/5">
               Media
             </Link>
+            <Link href="/admin/resend" className="border border-foreground/10 px-3 py-2 hover:bg-foreground/5">
+              Resend
+            </Link>
           </nav>
         </aside>
 

@@ -2,8 +2,22 @@
 
 import { redirect } from 'next/navigation'
 import { revalidatePath } from 'next/cache'
+import { Resend } from 'resend'
 import { requireAdmin } from '@/lib/admin'
 import { slugify } from '@/lib/cms'
+
+export type ResendCampaignState = {
+  status: 'idle' | 'success' | 'error'
+  message: string
+}
+
+function chunkEmails<T>(items: T[], size: number) {
+  const chunks: T[][] = []
+  for (let i = 0; i < items.length; i += size) {
+    chunks.push(items.slice(i, i + size))
+  }
+  return chunks
+}
 
 function revalidateCmsPaths(slug: string) {
   revalidatePath('/admin')
@@ -151,6 +165,12 @@ export async function updateSectionAction(formData: FormData) {
           button_text: String(formData.get('button_text') ?? '').trim(),
           button_url: String(formData.get('button_url') ?? '').trim(),
         }
+      : sectionType === 'newsletter'
+      ? {
+          heading: String(formData.get('heading') ?? '').trim(),
+          body: String(formData.get('body') ?? '').trim(),
+          button_text: String(formData.get('button_text') ?? '').trim(),
+        }
       : sectionType === 'image'
       ? {
           image_url: String(formData.get('image_url') ?? '').trim(),
@@ -266,6 +286,8 @@ export async function addTextSectionAction(formData: FormData) {
         }
       : type === 'cta'
       ? { heading: 'Call to action', body: '', button_text: 'Get started', button_url: '/' }
+      : type === 'newsletter'
+      ? { heading: 'Join the mailing list', body: 'Get updates by email.', button_text: 'Subscribe' }
       : type === 'image'
       ? { image_url: '', alt: '', caption: '', heading: '' }
       : type === 'faq'
@@ -388,4 +410,102 @@ export async function reorderSectionsAction(formData: FormData) {
   )
 
   revalidateCmsPaths(slug)
+}
+
+export async function sendResendCampaignAction(
+  _prevState: ResendCampaignState,
+  formData: FormData
+): Promise<ResendCampaignState> {
+  const { supabase } = await requireAdmin()
+
+  const subject = String(formData.get('subject') ?? '').trim()
+  const body = String(formData.get('body') ?? '').trim()
+  const htmlInput = String(formData.get('html') ?? '').trim()
+  const testEmail = String(formData.get('test_email') ?? '').trim().toLowerCase()
+
+  if (!subject) {
+    return { status: 'error', message: 'Subject is required.' }
+  }
+
+  if (!body && !htmlInput) {
+    return { status: 'error', message: 'Email body is required.' }
+  }
+
+  const apiKey = process.env.RESEND_API_KEY
+  if (!apiKey) {
+    return {
+      status: 'error',
+      message: 'Missing RESEND_API_KEY in environment configuration.',
+    }
+  }
+
+  const from = process.env.RESEND_FROM_EMAIL ?? 'PLCreative <onboarding@resend.dev>'
+  const resend = new Resend(apiKey)
+
+  const htmlBody = htmlInput || body
+    .split('\n')
+    .map((line) => line.trim())
+    .filter(Boolean)
+    .map((line) => `<p>${line.replace(/[<>&]/g, (c) => ({ '<': '&lt;', '>': '&gt;', '&': '&amp;' }[c] ?? c))}</p>`)
+    .join('')
+  const textBody = body || htmlInput.replace(/<[^>]*>/g, ' ').replace(/\s+/g, ' ').trim()
+
+  if (testEmail) {
+    await resend.emails.send({
+      from,
+      to: [testEmail],
+      subject: `[TEST] ${subject}`,
+      text: textBody,
+      html: htmlBody,
+    })
+
+    return {
+      status: 'success',
+      message: `Sent a test email to ${testEmail}.`,
+    }
+  }
+
+  const { data: rows, error } = await supabase
+    .from('mailing_list_subscribers')
+    .select('email')
+    .eq('status', 'subscribed')
+
+  if (error) {
+    return {
+      status: 'error',
+      message: 'Could not load subscribers from database.',
+    }
+  }
+
+  const recipients = Array.from(
+    new Set(
+      (rows ?? [])
+        .map((row) => String(row.email ?? '').trim().toLowerCase())
+        .filter(Boolean)
+    )
+  )
+
+  if (!recipients.length) {
+    return {
+      status: 'error',
+      message: 'No subscribed recipients found.',
+    }
+  }
+
+  let sentCount = 0
+  for (const batch of chunkEmails(recipients, 50)) {
+    await resend.emails.send({
+      from,
+      to: batch,
+      subject,
+      text: textBody,
+      html: htmlBody,
+    })
+    sentCount += batch.length
+  }
+
+  return {
+    status: 'success',
+    message: `Sent campaign to ${sentCount} subscriber${sentCount === 1 ? '' : 's'}.`,
+  }
 }

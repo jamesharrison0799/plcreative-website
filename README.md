@@ -1,5 +1,34 @@
 This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
 
+## Newsletter + Resend Setup
+
+This project includes a CMS `newsletter` section type that stores subscribers in Supabase and can send confirmation email via Resend.
+
+### Environment Variables
+
+Add these to `.env.local` and Vercel project settings:
+
+```bash
+NEXT_PUBLIC_SUPABASE_URL=...
+NEXT_PUBLIC_SUPABASE_ANON_KEY=...
+RESEND_API_KEY=...
+RESEND_FROM_EMAIL="PLCreative <onboarding@resend.dev>"
+# Optional: if set, contacts are also created in this Resend Audience
+RESEND_AUDIENCE_ID=...
+```
+
+### Database Migration
+
+Apply the included migration to create `mailing_list_subscribers`:
+
+```bash
+npx supabase db push
+```
+
+Migration file:
+
+- `supabase/migrations/202604260001_mailing_list_subscribers.sql`
+
 ## Getting Started
 
 First, run the development server:

@@ -2,6 +2,19 @@ import { createServerClient } from '@supabase/ssr'
 import { NextResponse, type NextRequest } from 'next/server'
 
 export async function proxy(request: NextRequest) {
+  const host = request.headers.get('host') || ''
+  
+  // Extract subdomain from host
+  // Handles: links.localhost:3000, links.domain.com, etc.
+  const subdomain = host.split('.')[0]
+
+  // If subdomain is 'links', rewrite to /links route
+  if (subdomain === 'links' && !request.nextUrl.pathname.startsWith('/links')) {
+    const url = request.nextUrl.clone()
+    url.pathname = `/links${url.pathname}`
+    return NextResponse.rewrite(url)
+  }
+
   let supabaseResponse = NextResponse.next({ request })
 
   const supabase = createServerClient(
@@ -50,5 +63,5 @@ export async function proxy(request: NextRequest) {
 }
 
 export const config = {
-  matcher: ['/admin/:path*', '/u/:path*/edit'],
+  matcher: ['/((?!_next|static|public|favicon.ico).*)'],
 }

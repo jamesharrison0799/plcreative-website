@@ -4,6 +4,7 @@ export type CmsPageStatus = 'draft' | 'published'
 export type CmsSectionType =
   | 'hero'
   | 'hero_media'
+  | 'newsletter'
   | 'text'
   | 'cta'
   | 'image'
