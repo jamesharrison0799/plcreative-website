@@ -1,5 +1,4 @@
 import Link from 'next/link'
-import { headers } from 'next/headers'
 import { createPageAction, updateSiteSettingsAction } from '@/app/admin/actions'
 import { requireAdmin } from '@/lib/admin'
 import { getPagesIndex, getSiteSettings } from '@/lib/cms'
@@ -7,10 +6,8 @@ import { getPagesIndex, getSiteSettings } from '@/lib/cms'
 export default async function AdminPage() {
   const { supabase } = await requireAdmin()
   
-  // Get the host to determine the links URL
-  const headersList = await headers()
-  const host = headersList.get('host') || ''
-  const isProduction = host.includes('plcreative.love')
+  // Determine the links URL based on environment
+  const isProduction = process.env.VERCEL_ENV === 'production'
   const linksUrl = isProduction ? 'https://links.plcreative.love' : 'http://links.localhost:3000'
   const [pages, siteSettings, subscribersCountRes] = await Promise.all([
     getPagesIndex(supabase),
