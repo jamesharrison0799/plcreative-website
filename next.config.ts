@@ -1,5 +1,7 @@
 import type { NextConfig } from "next";
 
+const devRootDomain = process.env.NEXT_PUBLIC_DEV_ROOT_DOMAIN?.trim().toLowerCase() || 'lvh.me'
+
 const securityHeaders = [
   { key: "X-Frame-Options", value: "SAMEORIGIN" },
   { key: "X-Content-Type-Options", value: "nosniff" },
@@ -8,6 +10,7 @@ const securityHeaders = [
 ]
 
 const nextConfig: NextConfig = {
+  allowedDevOrigins: [devRootDomain, `*.${devRootDomain}`],
   async headers() {
     return [
       {

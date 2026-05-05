@@ -1,109 +1,57 @@
-'use client'
-
-import { useMemo, useState } from 'react'
-import { useSearchParams } from 'next/navigation'
+import { headers } from 'next/headers'
+import { redirect } from 'next/navigation'
+import LoginForm from '@/components/LoginForm'
 import { buildRootDomainUrl, getRootDomainForHost } from '@/lib/subdomains'
-import { createClient } from '@/lib/supabase/client'
+import { createClient } from '@/lib/supabase/server'
 
-function getDefaultAdminUrl() {
-  if (typeof window === 'undefined') {
-    return '/admin'
-  }
-
-  return buildRootDomainUrl({
-    host: window.location.host,
-    protocol: window.location.protocol,
+function getSafeRedirectTo(host: string, protocol: string, redirectTo?: string | string[]) {
+  const defaultRedirect = buildRootDomainUrl({
+    host,
+    protocol,
     pathname: '/admin',
   })
-}
 
-function getSafeRedirectTo(redirectTo: string | null) {
-  if (typeof window === 'undefined') {
-    return '/admin'
-  }
+  const candidate = Array.isArray(redirectTo) ? redirectTo[0] : redirectTo
 
-  if (!redirectTo) {
-    return getDefaultAdminUrl()
+  if (!candidate) {
+    return defaultRedirect
   }
 
   try {
-    const targetUrl = new URL(redirectTo, window.location.href)
-    const currentRootDomain = getRootDomainForHost(window.location.host)
+    const targetUrl = new URL(candidate, `${protocol.replace(/:$/, '')}://${host}`)
+    const currentRootDomain = getRootDomainForHost(host)
     const targetRootDomain = getRootDomainForHost(targetUrl.host)
 
     if (currentRootDomain && currentRootDomain === targetRootDomain) {
       return targetUrl.toString()
     }
   } catch {
-    return getDefaultAdminUrl()
+    return defaultRedirect
   }
 
-  return getDefaultAdminUrl()
+  return defaultRedirect
 }
 
-export default function LoginPage() {
-  const [email, setEmail] = useState('')
-  const [password, setPassword] = useState('')
-  const [error, setError] = useState<string | null>(null)
-  const [loading, setLoading] = useState(false)
-  const searchParams = useSearchParams()
-  const supabase = createClient()
-  const redirectTo = useMemo(
-    () => getSafeRedirectTo(searchParams.get('redirectTo')),
-    [searchParams]
-  )
+export default async function LoginPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ redirectTo?: string | string[] }>
+}) {
+  const supabase = await createClient()
+  const {
+    data: { user },
+  } = await supabase.auth.getUser()
+  const headerStore = await headers()
+  const host = headerStore.get('x-forwarded-host') || headerStore.get('host') || ''
+  const protocol = headerStore.get('x-forwarded-proto') || 'https'
+  const resolvedSearchParams = await searchParams
+  const redirectTo = getSafeRedirectTo(host, protocol, resolvedSearchParams.redirectTo)
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault()
-    setLoading(true)
-    setError(null)
-
-    const { error } = await supabase.auth.signInWithPassword({ email, password })
-    if (error) {
-      setError(error.message)
-      setLoading(false)
-    } else {
-      window.location.assign(redirectTo)
-    }
+  if (user) {
+    redirect(redirectTo)
   }
 
-  return (
-    <main className="flex flex-1 items-center justify-center min-h-screen">
-      <div className="w-full max-w-sm flex flex-col gap-6">
-        <p className="text-center">Login</p>
-        <form onSubmit={handleSubmit} className="flex flex-col gap-4">
-          <input
-            type="email"
-            name="email"
-            placeholder="Email"
-            autoComplete="email"
-            value={email}
-            onChange={(e) => setEmail(e.target.value)}
-            required
-            className="border border-foreground/10 rounded bg-background px-3 py-2 text-sm outline-none focus:border-foreground/30"
-          />
-          <input
-            type="password"
-            name="password"
-            placeholder="Password"
-            autoComplete="current-password"
-            value={password}
-            onChange={(e) => setPassword(e.target.value)}
-            required
-            className="border border-foreground/10 rounded bg-background px-3 py-2 text-sm outline-none focus:border-foreground/30"
-          />
-          {error && <p className="text-xs text-red-500">{error}</p>}
-          <button
-            type="submit"
-            disabled={loading}
-            className="text-sm border border-foreground/10 rounded bg-background px-3 py-2 hover:bg-foreground/5 transition-colors disabled:opacity-50"
-          >
-            {loading ? '…' : 'Sign in'}
-          </button>
-        </form>
-      </div>
-    </main>
-  )
+  return <LoginForm redirectTo={redirectTo} />
 }
 
 

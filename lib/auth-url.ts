@@ -1,4 +1,4 @@
-import { buildSubdomainUrl } from '@/lib/subdomains'
+import { buildSubdomainUrl, supportsSubdomains } from '@/lib/subdomains'
 
 function addRedirectTo(url: string, redirectTo?: string) {
   if (!redirectTo) {
@@ -11,13 +11,12 @@ function addRedirectTo(url: string, redirectTo?: string) {
 }
 
 export function getClientAuthUrl(pathname = '/', redirectTo?: string) {
-  return addRedirectTo(
-    buildSubdomainUrl({
-      host: window.location.host,
-      protocol: window.location.protocol,
-      subdomain: 'auth',
-      pathname,
-    }),
-    redirectTo
-  )
+  const host = window.location.host
+  const protocol = window.location.protocol
+
+  const base = supportsSubdomains(host)
+    ? buildSubdomainUrl({ host, protocol, subdomain: 'auth', pathname })
+    : `${protocol}//${host}/login`
+
+  return addRedirectTo(base, redirectTo)
 }

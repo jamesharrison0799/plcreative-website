@@ -1,4 +1,19 @@
 const IPV4_ADDRESS_REGEX = /^\d{1,3}(?:\.\d{1,3}){3}$/
+const DEFAULT_DEV_ROOT_DOMAIN = 'lvh.me'
+
+function getDevelopmentRootDomain() {
+  const configured = process.env.NEXT_PUBLIC_DEV_ROOT_DOMAIN?.trim().toLowerCase()
+
+  if (configured) {
+    return configured
+  }
+
+  return process.env.NODE_ENV === 'development' ? DEFAULT_DEV_ROOT_DOMAIN : ''
+}
+
+function isLocalDevelopmentHostname(hostname: string) {
+  return hostname === 'localhost' || hostname.endsWith('.localhost')
+}
 
 function splitHost(host: string) {
   const [hostname = '', port = ''] = host.trim().toLowerCase().split(':')
@@ -10,7 +25,17 @@ function splitHost(host: string) {
 }
 
 function getRootDomain(hostname: string) {
-  if (!hostname || hostname === 'localhost' || IPV4_ADDRESS_REGEX.test(hostname)) {
+  const developmentRootDomain = getDevelopmentRootDomain()
+
+  if (!hostname) {
+    return hostname
+  }
+
+  if (isLocalDevelopmentHostname(hostname) && developmentRootDomain) {
+    return developmentRootDomain
+  }
+
+  if (hostname === 'localhost' || IPV4_ADDRESS_REGEX.test(hostname)) {
     return hostname
   }
 
@@ -46,6 +71,28 @@ export function getSubdomain(host: string) {
 
   const parts = hostname.split('.').filter(Boolean)
   return parts.length > 2 ? parts[0] : null
+}
+
+export function supportsSubdomains(host: string) {
+  const rootDomain = getRootDomainForHost(host)
+
+  return Boolean(rootDomain && rootDomain !== 'localhost' && !IPV4_ADDRESS_REGEX.test(rootDomain))
+}
+
+export function getPreferredDevelopmentHost(host: string) {
+  const developmentRootDomain = getDevelopmentRootDomain()
+  const { hostname, port } = splitHost(host)
+
+  if (!developmentRootDomain || !isLocalDevelopmentHostname(hostname)) {
+    return null
+  }
+
+  const subdomain = getSubdomain(host)
+  const preferredHostname = subdomain
+    ? `${subdomain}.${developmentRootDomain}`
+    : developmentRootDomain
+
+  return `${preferredHostname}${port ? `:${port}` : ''}`
 }
 
 export function buildSubdomainUrl({

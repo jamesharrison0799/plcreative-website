@@ -10,7 +10,7 @@ export function getSupabaseCookieOptions(host: string, protocol: string) {
 
   return {
     domain:
-      rootDomain && !isIpv4Address(rootDomain)
+      rootDomain && rootDomain !== 'localhost' && !isIpv4Address(rootDomain)
         ? rootDomain
         : undefined,
     path: '/',

@@ -1,6 +1,12 @@
 import { createServerClient } from '@supabase/ssr'
 import { NextResponse, type NextRequest } from 'next/server'
-import { buildRootDomainUrl, buildSubdomainUrl, getSubdomain } from '@/lib/subdomains'
+import {
+  buildRootDomainUrl,
+  buildSubdomainUrl,
+  getPreferredDevelopmentHost,
+  getSubdomain,
+  supportsSubdomains,
+} from '@/lib/subdomains'
 import { getSupabaseCookieOptions } from '@/lib/supabase/cookie-options'
 
 function withRedirectTo(url: string, redirectTo: string) {
@@ -13,6 +19,14 @@ export async function proxy(request: NextRequest) {
   const host = request.headers.get('x-forwarded-host') || request.headers.get('host') || request.nextUrl.host || ''
   const protocol = request.headers.get('x-forwarded-proto') || request.nextUrl.protocol
   const subdomain = getSubdomain(host)
+  const preferredDevelopmentHost = getPreferredDevelopmentHost(host)
+
+  if (preferredDevelopmentHost) {
+    const normalizedProtocol = protocol.replace(/:$/, '') || 'http'
+    return NextResponse.redirect(
+      `${normalizedProtocol}://${preferredDevelopmentHost}${request.nextUrl.pathname}${request.nextUrl.search}`
+    )
+  }
 
   if (request.nextUrl.pathname.startsWith('/admin') && subdomain) {
     return NextResponse.redirect(
@@ -24,7 +38,7 @@ export async function proxy(request: NextRequest) {
     )
   }
 
-  if (request.nextUrl.pathname === '/login' && subdomain !== 'auth') {
+  if (request.nextUrl.pathname === '/login' && subdomain !== 'auth' && supportsSubdomains(host)) {
     return NextResponse.redirect(
       buildSubdomainUrl({
         host,
@@ -85,16 +99,10 @@ export async function proxy(request: NextRequest) {
   } = await supabase.auth.getUser()
 
   if (!user && (request.nextUrl.pathname.startsWith('/admin') || request.nextUrl.pathname.endsWith('/edit'))) {
-    return NextResponse.redirect(
-      withRedirectTo(
-        buildSubdomainUrl({
-          host,
-          protocol,
-          subdomain: 'auth',
-        }),
-        request.nextUrl.href
-      )
-    )
+    const loginUrl = supportsSubdomains(host)
+      ? buildSubdomainUrl({ host, protocol, subdomain: 'auth' })
+      : `${protocol.replace(/:$/, '')}://${host}/login`
+    return NextResponse.redirect(withRedirectTo(loginUrl, request.nextUrl.href))
   }
 
   if (user && request.nextUrl.pathname.startsWith('/admin')) {
