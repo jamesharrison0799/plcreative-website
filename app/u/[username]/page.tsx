@@ -1,5 +1,6 @@
 import { createClient } from '@/lib/supabase/server'
 import { notFound } from 'next/navigation'
+import Image from 'next/image'
 
 export default async function UserProfilePage({
   params,
@@ -33,11 +34,12 @@ export default async function UserProfilePage({
             <p className="text-sm text-gray-400">@{profile.username}</p>
           </div>
           {profile.avatar_url && (
-            // eslint-disable-next-line @next/next/no-img-element
-            <img
+            <Image
               src={profile.avatar_url}
               alt={profile.display_name || profile.username || ''}
-              className="w-16 h-16 rounded-full object-cover"
+              width={64}
+              height={64}
+              className="rounded-full object-cover"
             />
           )}
         </div>
@@ -48,7 +50,7 @@ export default async function UserProfilePage({
           {profile.location && <span>{profile.location}</span>}
           {profile.website && (
             <a
-              href={profile.website}
+              href={/^https?:\/\//.test(profile.website) ? profile.website : `https://${profile.website}`}
               target="_blank"
               rel="noopener noreferrer"
               className="hover:text-gray-700 underline"

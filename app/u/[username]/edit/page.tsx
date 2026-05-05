@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
+import NextImage from 'next/image'
 
 const PREVIEW_SIZE = 320
 const OUTPUT_SIZE = 512
@@ -401,11 +402,12 @@ export default function EditProfilePage({
             <div className="border border-gray-200 p-4">
               <div className="flex items-start gap-4">
                 {form.avatar_url ? (
-                  // eslint-disable-next-line @next/next/no-img-element
-                  <img
+                  <NextImage
                     src={form.avatar_url}
                     alt={form.display_name || form.username || 'Profile picture'}
-                    className="h-20 w-20 rounded-full object-cover border border-gray-200"
+                    width={80}
+                    height={80}
+                    className="rounded-full object-cover border border-gray-200"
                   />
                 ) : (
                   <div className="flex h-20 w-20 items-center justify-center rounded-full border border-dashed border-gray-300 text-xs text-gray-400">
@@ -542,8 +544,8 @@ export default function EditProfilePage({
                     setPanY(0)
                   }}
                 >
-                  {/* eslint-disable-next-line @next/next/no-img-element */}
-                  <img
+                  {/* img is intentional — next/image does not support blob: object URLs */}
+                  <img // eslint-disable-line @next/next/no-img-element
                     src={selectedAvatar.objectUrl}
                     alt="New avatar preview"
                     className="absolute max-w-none select-none"

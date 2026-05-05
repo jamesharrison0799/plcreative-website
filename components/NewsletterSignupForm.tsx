@@ -22,6 +22,14 @@ export default function NewsletterSignupForm({
     <form action={formAction} className="mx-auto grid max-w-md grid-cols-1 gap-2 sm:grid-cols-[1fr_auto]">
       <input type="hidden" name="source" value={source} />
       <input
+        type="text"
+        name="company"
+        tabIndex={-1}
+        autoComplete="off"
+        aria-hidden="true"
+        className="hidden"
+      />
+      <input
         type="email"
         name="email"
         required

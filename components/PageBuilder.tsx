@@ -3,8 +3,8 @@
 import {
   useState,
   useCallback,
-  useEffect,
   useRef,
+  useSyncExternalStore,
   useTransition,
 } from 'react'
 import ReactMarkdown from 'react-markdown'
@@ -975,6 +975,11 @@ export default function PageBuilder({ page, initialSections }: Props) {
   const supabase = createClient()
   const router = useRouter()
   const [, startTransition] = useTransition()
+  const isClientReady = useSyncExternalStore(
+    () => () => {},
+    () => true,
+    () => false
+  )
 
   // Sections & edits
   const [sections, setSections] = useState(initialSections)
@@ -984,18 +989,6 @@ export default function PageBuilder({ page, initialSections }: Props) {
     return m
   })
 
-  // Keep local state in sync after router refreshes (adds/deletes)
-  useEffect(() => {
-    setSections(initialSections)
-    setEditMap((prev) => {
-      const m: Record<string, EditState> = {}
-      for (const s of initialSections) {
-        m[s.id] = prev[s.id] ?? getEditState(s)
-      }
-      return m
-    })
-  }, [initialSections])
-
   // UI state
   const [selectedId, setSelectedId] = useState<string | null>(null)
   const [addType, setAddType] = useState('text')
@@ -1003,11 +996,6 @@ export default function PageBuilder({ page, initialSections }: Props) {
   const [savingIds, setSavingIds] = useState<Set<string>>(new Set())
   const [uploadingField, setUploadingField] = useState<'image_url' | 'media_url' | 'logo_url' | 'title_image_url' | null>(null)
   const [uploadError, setUploadError] = useState<string | null>(null)
-  const [isClientReady, setIsClientReady] = useState(false)
-
-  useEffect(() => {
-    setIsClientReady(true)
-  }, [])
 
   // Refs for scrolling section into view in left panel
   const cardRefs = useRef<Record<string, HTMLDivElement | null>>({})

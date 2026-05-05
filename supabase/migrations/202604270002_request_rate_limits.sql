@@ -1,20 +1,3 @@
-#!/bin/bash
-
-# This script helps you manually run SQL migrations in Supabase
-# You'll need to get your service role key from the Supabase dashboard:
-# 1. Go to https://supabase.com/dashboard
-# 2. Select your project
-# 3. Settings > API > Service Role (secret)
-
-echo "To apply the durable rate-limit migration:"
-echo "1. Visit: https://supabase.com/dashboard"
-echo "2. Select project: mbyfthldaoggvlgytjuz"
-echo "3. Click 'SQL Editor' in the left sidebar"
-echo "4. Click 'New query'"
-echo "5. Paste and run this SQL:"
-echo ""
-echo "---START SQL---"
-cat << 'EOF'
 create table if not exists public.request_rate_limits (
   key text primary key,
   window_started_at timestamptz not null default now(),
@@ -63,8 +46,3 @@ $$;
 
 revoke all on function public.check_rate_limit(text, integer, integer) from public;
 grant execute on function public.check_rate_limit(text, integer, integer) to anon, authenticated, service_role;
-EOF
-echo ""
-echo "---END SQL---"
-echo ""
-echo "After running, newsletter signup rate-limiting is enforced via database RPC."

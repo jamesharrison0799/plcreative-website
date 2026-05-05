@@ -3,6 +3,19 @@
 import { useRef, useState } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import { useRouter } from 'next/navigation'
+const ALLOWED_MIME_TYPES = new Set([
+  'image/jpeg',
+  'image/png',
+  'image/gif',
+  'image/webp',
+  'image/svg+xml',
+  'video/mp4',
+  'video/webm',
+  'application/pdf',
+])
+
+const MAX_FILE_SIZE_BYTES = 10 * 1024 * 1024 // 10 MB
+
 
 export default function MediaUploader() {
   const inputRef = useRef<HTMLInputElement>(null)
@@ -17,7 +30,28 @@ export default function MediaUploader() {
     setError(null)
 
     for (const file of Array.from(files)) {
-      const ext = file.name.split('.').pop()?.toLowerCase() ?? 'bin'
+      if (!ALLOWED_MIME_TYPES.has(file.type)) {
+        setError(`File type not allowed: ${file.type || 'unknown'}`)
+        continue
+      }
+
+      if (file.size > MAX_FILE_SIZE_BYTES) {
+        setError(`File too large (max 10 MB): ${file.name}`)
+        continue
+      }
+
+      // Derive extension from MIME type to ignore misleading filenames
+      const mimeToExt: Record<string, string> = {
+        'image/jpeg': 'jpg',
+        'image/png': 'png',
+        'image/gif': 'gif',
+        'image/webp': 'webp',
+        'image/svg+xml': 'svg',
+        'video/mp4': 'mp4',
+        'video/webm': 'webm',
+        'application/pdf': 'pdf',
+      }
+      const ext = mimeToExt[file.type] ?? 'bin'
       const path = `${Date.now()}-${Math.random().toString(36).slice(2)}.${ext}`
 
       const { error: uploadError } = await supabase.storage

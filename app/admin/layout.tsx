@@ -27,6 +27,9 @@ export default async function AdminLayout({
             <Link href="/admin/pages/home" className="border border-foreground/10 px-3 py-2 hover:bg-foreground/5">
               Edit Home Page
             </Link>
+            <Link href="/links" className="border border-foreground/10 px-3 py-2 hover:bg-foreground/5">
+              Links
+            </Link>
             <Link href="/admin/users" className="border border-foreground/10 px-3 py-2 hover:bg-foreground/5">
               Users
             </Link>

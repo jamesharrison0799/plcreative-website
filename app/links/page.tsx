@@ -1,4 +1,8 @@
-import { createClient } from '@supabase/supabase-js'
+import { createClient } from '@/lib/supabase/server'
+import LinksBuilder from '@/components/LinksBuilder'
+
+export const dynamic = 'force-dynamic'
+export const revalidate = 0
 
 interface Link {
   id: string
@@ -6,55 +10,64 @@ interface Link {
   title: string
   description: string | null
   order_index: number
+  position_x: number
+  position_y: number
+  velocity_x: number
+  velocity_y: number
 }
 
 export default async function LinksPage() {
-  const supabase = createClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
-  )
+  const supabase = await createClient()
 
   let links: Link[] = []
-  
+  let isAdmin = false
+  let loadState:
+    | { kind: 'ready' }
+    | { kind: 'missing-table'; message: string }
+    | { kind: 'error'; code?: string | null; message: string } = { kind: 'ready' }
+
+  const {
+    data: { user },
+  } = await supabase.auth.getUser()
+
+  if (user) {
+    const { data: profile } = await supabase
+      .from('profiles')
+      .select('role')
+      .eq('id', user.id)
+      .single<{ role: string }>()
+
+    isAdmin = profile?.role === 'admin'
+  }
+
   try {
     const { data, error } = await supabase
       .from('links')
-      .select('*')
+      .select('id, url, title, description, order_index, position_x, position_y, velocity_x, velocity_y')
       .order('order_index', { ascending: true })
 
-    if (error && error.code !== 'PGRST205') {
+    if (error?.code === 'PGRST205') {
+      loadState = {
+        kind: 'missing-table',
+        message: 'The public.links table is missing from Supabase.',
+      }
+    } else if (error) {
       console.error('Failed to fetch links:', error)
+      loadState = {
+        kind: 'error',
+        code: error.code,
+        message: error.message,
+      }
     }
-    
+
     links = data || []
   } catch (err) {
     console.error('Error fetching links:', err)
+    loadState = {
+      kind: 'error',
+      message: err instanceof Error ? err.message : 'Unknown error loading links.',
+    }
   }
 
-  return (
-    <div className="flex items-center justify-center min-h-screen px-4">
-      <div className="w-full max-w-md">
-        <h1 className="text-center text-sm text-foreground mb-8">links</h1>
-        
-        <div className="space-y-3">
-          {links && links.length > 0 ? (
-            links.map((link) => (
-              <a
-                key={link.id}
-                href={link.url}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="block border border-foreground/10 p-4 text-sm hover:bg-foreground/5 transition-colors"
-              >
-                <p className="font-medium">{link.title}</p>
-                {link.description && <p className="text-xs text-foreground/60 mt-1">{link.description}</p>}
-              </a>
-            ))
-          ) : (
-            <p className="text-center text-sm text-foreground/50">No links yet</p>
-          )}
-        </div>
-      </div>
-    </div>
-  )
+  return <LinksBuilder initialLinks={links} isAdmin={isAdmin} initialLoadState={loadState} />
 }

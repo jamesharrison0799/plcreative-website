@@ -370,6 +370,177 @@ export async function updateSiteSettingsAction(formData: FormData) {
   revalidatePath('/')
 }
 
+type LinkBuilderItem = {
+  id?: string
+  title: string
+  url: string
+  description?: string | null
+  position_x?: number | null
+  position_y?: number | null
+  velocity_x?: number | null
+  velocity_y?: number | null
+}
+
+function normalizeLinkNumber(value: unknown, fallback: number) {
+  const nextValue = typeof value === 'number' ? value : Number(value)
+  return Number.isFinite(nextValue) ? nextValue : fallback
+}
+
+function normalizeLinkUrl(value: string) {
+  const raw = value.trim()
+  if (!raw) return ''
+
+  if (
+    raw.startsWith('/') ||
+    raw.startsWith('#') ||
+    raw.startsWith('mailto:') ||
+    raw.startsWith('tel:')
+  ) {
+    return raw
+  }
+
+  if (/^https?:\/\//i.test(raw)) {
+    return raw
+  }
+
+  return `https://${raw}`
+}
+
+export async function saveLinksBuilderAction(items: LinkBuilderItem[]) {
+  const { supabase } = await requireAdmin()
+
+  const normalized = (Array.isArray(items) ? items : [])
+    .map((item) => ({
+      id: typeof item?.id === 'string' ? item.id.trim() : '',
+      title: typeof item?.title === 'string' ? item.title.trim() || 'Untitled' : 'Untitled',
+      url: normalizeLinkUrl(typeof item?.url === 'string' ? item.url : ''),
+      description:
+        typeof item?.description === 'string' ? item.description.trim() : '',
+      position_x: normalizeLinkNumber(item?.position_x, 50),
+      position_y: normalizeLinkNumber(item?.position_y, 50),
+      velocity_x: normalizeLinkNumber(item?.velocity_x, 0),
+      velocity_y: normalizeLinkNumber(item?.velocity_y, 0),
+    }))
+    .filter((item) => item.url)
+
+  const { data: existingRows, error: existingError } = await supabase
+    .from('links')
+    .select('id')
+    .returns<Array<{ id: string }>>()
+
+  if (existingError) {
+    return {
+      ok: false,
+      message: 'Could not load existing links.',
+    }
+  }
+
+  const existingIds = new Set((existingRows ?? []).map((row) => row.id))
+  const keptIds = new Set(normalized.map((item) => item.id).filter((id) => existingIds.has(id)))
+  const idsToDelete = (existingRows ?? [])
+    .map((row) => row.id)
+    .filter((id) => !keptIds.has(id))
+
+  if (idsToDelete.length > 0) {
+    const { error: deleteError } = await supabase.from('links').delete().in('id', idsToDelete)
+    if (deleteError) {
+      return {
+        ok: false,
+        message: 'Could not remove deleted links.',
+      }
+    }
+  }
+
+  const now = new Date().toISOString()
+  const rowsToUpdate = normalized
+    .map((item, orderIndex) => ({
+      ...item,
+      orderIndex,
+    }))
+    .filter((item) => item.id && existingIds.has(item.id))
+
+  const rowsToInsert = normalized
+    .map((item, orderIndex) => ({
+      ...item,
+      orderIndex,
+    }))
+    .filter((item) => !item.id || !existingIds.has(item.id))
+
+  if (rowsToUpdate.length > 0) {
+    const updateResults = await Promise.all(
+      rowsToUpdate.map((item) =>
+        supabase
+          .from('links')
+          .update({
+            title: item.title,
+            url: item.url,
+            description: item.description || null,
+            position_x: item.position_x,
+            position_y: item.position_y,
+            velocity_x: item.velocity_x,
+            velocity_y: item.velocity_y,
+            order_index: item.orderIndex,
+            updated_at: now,
+          })
+          .eq('id', item.id)
+      )
+    )
+
+    if (updateResults.some((result) => result.error)) {
+      return {
+        ok: false,
+        message: 'Could not update one or more links.',
+      }
+    }
+  }
+
+  if (rowsToInsert.length > 0) {
+    const { error: insertError } = await supabase.from('links').insert(
+      rowsToInsert.map((item) => ({
+        title: item.title,
+        url: item.url,
+        description: item.description || null,
+        position_x: item.position_x,
+        position_y: item.position_y,
+        velocity_x: item.velocity_x,
+        velocity_y: item.velocity_y,
+        order_index: item.orderIndex,
+        updated_at: now,
+      }))
+    )
+
+    if (insertError) {
+      return {
+        ok: false,
+        message: 'Could not create one or more new links.',
+      }
+    }
+  }
+
+  revalidatePath('/admin')
+  revalidatePath('/admin/links')
+  revalidatePath('/links')
+  revalidatePath('/')
+
+  const { data: savedLinks, error: savedLinksError } = await supabase
+    .from('links')
+    .select('id, title, url, description, order_index, position_x, position_y, velocity_x, velocity_y')
+    .order('order_index', { ascending: true })
+
+  if (savedLinksError) {
+    return {
+      ok: false,
+      message: 'Links saved, but the refreshed link list could not be loaded.',
+    }
+  }
+
+  return {
+    ok: true,
+    message: 'Links saved.',
+    links: savedLinks ?? [],
+  }
+}
+
 export async function updateUserRoleAction(formData: FormData) {
   const { supabase } = await requireAdmin()
 
@@ -508,84 +679,4 @@ export async function sendResendCampaignAction(
     status: 'success',
     message: `Sent campaign to ${sentCount} subscriber${sentCount === 1 ? '' : 's'}.`,
   }
-}
-
-export async function createLinkAction(formData: FormData) {
-  const { supabase } = await requireAdmin()
-
-  const url = String(formData.get('url') ?? '').trim()
-  const title = String(formData.get('title') ?? '').trim()
-  const description = String(formData.get('description') ?? '').trim()
-
-  if (!url || !title) {
-    return
-  }
-
-  await supabase.from('links').insert({
-    url,
-    title,
-    description,
-    order_index: 0,
-    updated_at: new Date().toISOString(),
-  })
-
-  revalidatePath('/admin/links')
-  revalidatePath('/links')
-}
-
-export async function updateLinkAction(formData: FormData) {
-  const { supabase } = await requireAdmin()
-
-  const id = String(formData.get('id') ?? '')
-  const url = String(formData.get('url') ?? '').trim()
-  const title = String(formData.get('title') ?? '').trim()
-  const description = String(formData.get('description') ?? '').trim()
-
-  if (!id || !url || !title) {
-    return
-  }
-
-  await supabase
-    .from('links')
-    .update({
-      url,
-      title,
-      description,
-      updated_at: new Date().toISOString(),
-    })
-    .eq('id', id)
-
-  revalidatePath('/admin/links')
-  revalidatePath('/links')
-}
-
-export async function deleteLinkAction(formData: FormData) {
-  const { supabase } = await requireAdmin()
-
-  const id = String(formData.get('id') ?? '')
-
-  if (!id) {
-    return
-  }
-
-  await supabase.from('links').delete().eq('id', id)
-
-  revalidatePath('/admin/links')
-  revalidatePath('/links')
-}
-
-export async function reorderLinksAction(formData: FormData) {
-  const { supabase } = await requireAdmin()
-
-  const items = JSON.parse(String(formData.get('items') ?? '[]'))
-
-  for (let i = 0; i < items.length; i++) {
-    await supabase
-      .from('links')
-      .update({ order_index: i })
-      .eq('id', items[i].id)
-  }
-
-  revalidatePath('/admin/links')
-  revalidatePath('/links')
 }

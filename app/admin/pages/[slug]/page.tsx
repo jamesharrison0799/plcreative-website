@@ -18,6 +18,7 @@ export default async function AdminEditPage({
 
   return (
     <PageBuilder
+      key={cmsPage.sections.map((section) => `${section.id}:${section.updated_at}:${section.position}`).join('|')}
       page={cmsPage.page}
       initialSections={cmsPage.sections}
     />

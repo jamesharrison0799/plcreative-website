@@ -1,5 +1,6 @@
 'use server'
 
+import { headers } from 'next/headers'
 import { Resend } from 'resend'
 import { createClient } from '@/lib/supabase/server'
 
@@ -17,8 +18,15 @@ export async function subscribeNewsletterAction(
   _prevState: SubscribeState,
   formData: FormData
 ): Promise<SubscribeState> {
+  const honey = String(formData.get('company') ?? '').trim()
   const email = String(formData.get('email') ?? '').trim().toLowerCase()
-  const source = String(formData.get('source') ?? 'website').trim() || 'website'
+  const ALLOWED_SOURCES = new Set(['website', 'footer', 'popup', 'landing'])
+  const rawSource = String(formData.get('source') ?? '').trim()
+  const source = ALLOWED_SOURCES.has(rawSource) ? rawSource : 'website'
+
+  if (honey) {
+    return { status: 'success', message: 'Thanks, you are on the mailing list.' }
+  }
 
   if (!email) {
     return { status: 'error', message: 'Email is required.' }
@@ -30,6 +38,25 @@ export async function subscribeNewsletterAction(
   }
 
   const supabase = await createClient()
+
+  const headerStore = await headers()
+  const forwardedFor = headerStore.get('x-forwarded-for') ?? ''
+  const ip = forwardedFor.split(',')[0]?.trim() || 'unknown'
+  const rateLimitKey = `newsletter:${ip}`
+
+  const { data: allowed, error: rateLimitError } = await supabase.rpc('check_rate_limit', {
+    p_key: rateLimitKey,
+    p_limit: 5,
+    p_window_seconds: 10 * 60,
+  })
+
+  if (!rateLimitError && allowed === false) {
+    return {
+      status: 'error',
+      message: 'Too many attempts. Please wait a few minutes and try again.',
+    }
+  }
+
   const { error: dbError } = await supabase
     .from('mailing_list_subscribers')
     .upsert(
