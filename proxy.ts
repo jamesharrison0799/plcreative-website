@@ -3,15 +3,17 @@ import { NextResponse, type NextRequest } from 'next/server'
 
 export async function proxy(request: NextRequest) {
   const host = request.headers.get('host') || ''
-  
-  // Extract subdomain from host
-  // Handles: links.localhost:3000, links.domain.com, etc.
   const subdomain = host.split('.')[0]
 
-  // If subdomain is 'links', rewrite to /links route (stay on subdomain)
   if (subdomain === 'links' && !request.nextUrl.pathname.startsWith('/links')) {
     const url = request.nextUrl.clone()
     url.pathname = `/links${url.pathname}`
+    return NextResponse.rewrite(url)
+  }
+
+  if (subdomain === 'bus' && !request.nextUrl.pathname.startsWith('/bus')) {
+    const url = request.nextUrl.clone()
+    url.pathname = `/bus${url.pathname}`
     return NextResponse.rewrite(url)
   }
 
@@ -28,15 +30,17 @@ export async function proxy(request: NextRequest) {
         setAll(cookiesToSet) {
           cookiesToSet.forEach(({ name, value }) => request.cookies.set(name, value))
           supabaseResponse = NextResponse.next({ request })
-          cookiesToSet.forEach(({ name, value, options }) =>
+          cookiesToSet.forEach(({ name, value, options }) => {
             supabaseResponse.cookies.set(name, value, options)
-          )
+          })
         },
       },
     }
   )
 
-  const { data: { user } } = await supabase.auth.getUser()
+  const {
+    data: { user },
+  } = await supabase.auth.getUser()
 
   if (!user && (request.nextUrl.pathname.startsWith('/admin') || request.nextUrl.pathname.endsWith('/edit'))) {
     const url = request.nextUrl.clone()
@@ -44,7 +48,6 @@ export async function proxy(request: NextRequest) {
     return NextResponse.redirect(url)
   }
 
-  // Non-admins hitting /admin get redirected to home
   if (user && request.nextUrl.pathname.startsWith('/admin')) {
     const { data: profile } = await supabase
       .from('profiles')
