@@ -64,6 +64,12 @@ type LiveDraftPayload = {
   links: EditableLink[]
   activeId: string | null
   editingId: string | null
+  titleImageUrl: string | null
+  titleImageSize: number
+  titleImagePaddingTop: number
+  titleImagePaddingRight: number
+  titleImagePaddingBottom: number
+  titleImagePaddingLeft: number
 }
 
 const QUICK_TEMPLATES = [
@@ -265,15 +271,35 @@ function PageLinkShell({
 }
 
 async function fetchLinksSnapshot(supabase: SupabaseBrowserClient) {
-  const { data, error } = await supabase
-    .from('links')
-    .select('id, title, url, description, order_index, position_x, position_y, velocity_x, velocity_y')
-    .order('order_index', { ascending: true })
-    .returns<LinkRecord[]>()
+  const [{ data, error }, { data: settings }] = await Promise.all([
+    supabase
+      .from('links')
+      .select('id, title, url, description, order_index, position_x, position_y, velocity_x, velocity_y')
+      .order('order_index', { ascending: true })
+      .returns<LinkRecord[]>(),
+    supabase
+      .from('links_settings')
+      .select('title_image_url, title_image_size, title_image_padding_top, title_image_padding_right, title_image_padding_bottom, title_image_padding_left')
+      .eq('id', 1)
+      .maybeSingle<{
+        title_image_url: string | null
+        title_image_size: number | null
+        title_image_padding_top: number | null
+        title_image_padding_right: number | null
+        title_image_padding_bottom: number | null
+        title_image_padding_left: number | null
+      }>(),
+  ])
 
   if (error?.code === 'PGRST205') {
     return {
       links: [] as LinkRecord[],
+      titleImageUrl: settings?.title_image_url ?? null,
+      titleImageSize: settings?.title_image_size ?? 100,
+      titleImagePaddingTop: settings?.title_image_padding_top ?? 0,
+      titleImagePaddingRight: settings?.title_image_padding_right ?? 0,
+      titleImagePaddingBottom: settings?.title_image_padding_bottom ?? 0,
+      titleImagePaddingLeft: settings?.title_image_padding_left ?? 0,
       loadState: {
         kind: 'missing-table',
         message: 'The public.links table is missing from Supabase.',
@@ -284,6 +310,12 @@ async function fetchLinksSnapshot(supabase: SupabaseBrowserClient) {
   if (error) {
     return {
       links: [] as LinkRecord[],
+      titleImageUrl: settings?.title_image_url ?? null,
+      titleImageSize: settings?.title_image_size ?? 100,
+      titleImagePaddingTop: settings?.title_image_padding_top ?? 0,
+      titleImagePaddingRight: settings?.title_image_padding_right ?? 0,
+      titleImagePaddingBottom: settings?.title_image_padding_bottom ?? 0,
+      titleImagePaddingLeft: settings?.title_image_padding_left ?? 0,
       loadState: {
         kind: 'error',
         code: error.code,
@@ -294,6 +326,12 @@ async function fetchLinksSnapshot(supabase: SupabaseBrowserClient) {
 
   return {
     links: data ?? [],
+    titleImageUrl: settings?.title_image_url ?? null,
+    titleImageSize: settings?.title_image_size ?? 100,
+    titleImagePaddingTop: settings?.title_image_padding_top ?? 0,
+    titleImagePaddingRight: settings?.title_image_padding_right ?? 0,
+    titleImagePaddingBottom: settings?.title_image_padding_bottom ?? 0,
+    titleImagePaddingLeft: settings?.title_image_padding_left ?? 0,
     loadState: { kind: 'ready' } satisfies LoadState,
   }
 }
@@ -470,10 +508,22 @@ export default function LinksBuilder({
   initialLinks,
   isAdmin,
   initialLoadState,
+  initialTitleImageUrl,
+  initialTitleImageSize,
+  initialTitleImagePaddingTop,
+  initialTitleImagePaddingRight,
+  initialTitleImagePaddingBottom,
+  initialTitleImagePaddingLeft,
 }: {
   initialLinks: LinkRecord[]
   isAdmin: boolean
   initialLoadState: LoadState
+  initialTitleImageUrl: string | null
+  initialTitleImageSize: number
+  initialTitleImagePaddingTop: number
+  initialTitleImagePaddingRight: number
+  initialTitleImagePaddingBottom: number
+  initialTitleImagePaddingLeft: number
 }) {
   const supabase = useMemo(() => createClient(), [])
   const [isPending, startTransition] = useTransition()
@@ -488,7 +538,20 @@ export default function LinksBuilder({
   const [selectedDraft, setSelectedDraft] = useState<EditableLink | null>(() => toEditableLinks(initialLinks)[0] ?? null)
   const [isAutoSaving, setIsAutoSaving] = useState(false)
   const [lastSavedFingerprint, setLastSavedFingerprint] = useState(() => serializeLinks(toEditableLinks(initialLinks)))
+  const [lastSavedTitleImageUrl, setLastSavedTitleImageUrl] = useState(initialTitleImageUrl ?? '')
+  const [lastSavedTitleImageSize, setLastSavedTitleImageSize] = useState(initialTitleImageSize)
+  const [lastSavedTitleImagePaddingTop, setLastSavedTitleImagePaddingTop] = useState(initialTitleImagePaddingTop)
+  const [lastSavedTitleImagePaddingRight, setLastSavedTitleImagePaddingRight] = useState(initialTitleImagePaddingRight)
+  const [lastSavedTitleImagePaddingBottom, setLastSavedTitleImagePaddingBottom] = useState(initialTitleImagePaddingBottom)
+  const [lastSavedTitleImagePaddingLeft, setLastSavedTitleImagePaddingLeft] = useState(initialTitleImagePaddingLeft)
   const [remoteDraft, setRemoteDraft] = useState<LiveDraftPayload | null>(null)
+  const [titleImageUrl, setTitleImageUrl] = useState<string | null>(initialTitleImageUrl)
+  const [titleImageSize, setTitleImageSize] = useState(initialTitleImageSize)
+  const [titleImagePaddingTop, setTitleImagePaddingTop] = useState(initialTitleImagePaddingTop)
+  const [titleImagePaddingRight, setTitleImagePaddingRight] = useState(initialTitleImagePaddingRight)
+  const [titleImagePaddingBottom, setTitleImagePaddingBottom] = useState(initialTitleImagePaddingBottom)
+  const [titleImagePaddingLeft, setTitleImagePaddingLeft] = useState(initialTitleImagePaddingLeft)
+  const [isUploadingTitleImage, setIsUploadingTitleImage] = useState(false)
   const clientId = useMemo(() => makeClientId(), [])
   const channelRef = useRef<RealtimeChannel | null>(null)
   const itemRefs = useRef(new Map<string, HTMLDivElement>())
@@ -501,12 +564,41 @@ export default function LinksBuilder({
     useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates })
   )
 
-  const hasLocalInteractiveState = isAdmin && (activeId !== null || serializeLinks(links) !== lastSavedFingerprint)
+  const hasLocalInteractiveState =
+    isAdmin &&
+    (
+      activeId !== null ||
+      serializeLinks(links) !== lastSavedFingerprint ||
+      (titleImageUrl ?? '') !== lastSavedTitleImageUrl ||
+      titleImageSize !== lastSavedTitleImageSize ||
+      titleImagePaddingTop !== lastSavedTitleImagePaddingTop ||
+      titleImagePaddingRight !== lastSavedTitleImagePaddingRight ||
+      titleImagePaddingBottom !== lastSavedTitleImagePaddingBottom ||
+      titleImagePaddingLeft !== lastSavedTitleImagePaddingLeft
+    )
   const remoteDraftMatchesPersisted = remoteDraft ? serializeLinks(remoteDraft.links) === serializeLinks(links) : false
   const shouldShowRemoteDraft = Boolean(
     remoteDraft && !hasLocalInteractiveState && (!remoteDraftMatchesPersisted || remoteDraft.activeId || remoteDraft.editingId)
   )
   const draftLinks = shouldShowRemoteDraft && remoteDraft ? remoteDraft.links : null
+  const displayedTitleImageUrl = shouldShowRemoteDraft && remoteDraft
+    ? remoteDraft.titleImageUrl
+    : titleImageUrl
+  const displayedTitleImageSize = shouldShowRemoteDraft && remoteDraft
+    ? remoteDraft.titleImageSize
+    : titleImageSize
+  const displayedTitleImagePaddingTop = shouldShowRemoteDraft && remoteDraft
+    ? remoteDraft.titleImagePaddingTop
+    : titleImagePaddingTop
+  const displayedTitleImagePaddingRight = shouldShowRemoteDraft && remoteDraft
+    ? remoteDraft.titleImagePaddingRight
+    : titleImagePaddingRight
+  const displayedTitleImagePaddingBottom = shouldShowRemoteDraft && remoteDraft
+    ? remoteDraft.titleImagePaddingBottom
+    : titleImagePaddingBottom
+  const displayedTitleImagePaddingLeft = shouldShowRemoteDraft && remoteDraft
+    ? remoteDraft.titleImagePaddingLeft
+    : titleImagePaddingLeft
   const deferredLinks = useDeferredValue(links)
   const renderedLinks = draftLinks ?? (isAdmin ? deferredLinks : links)
   const displayedActiveId = activeId ?? remoteDraft?.activeId ?? null
@@ -645,6 +737,18 @@ export default function LinksBuilder({
             setLoadState(snapshot.loadState)
             setLinks(nextLinks)
             setLastSavedFingerprint(serializeLinks(nextLinks))
+            setTitleImageUrl(snapshot.titleImageUrl)
+            setLastSavedTitleImageUrl(snapshot.titleImageUrl ?? '')
+            setTitleImageSize(snapshot.titleImageSize)
+            setTitleImagePaddingTop(snapshot.titleImagePaddingTop)
+            setTitleImagePaddingRight(snapshot.titleImagePaddingRight)
+            setTitleImagePaddingBottom(snapshot.titleImagePaddingBottom)
+            setTitleImagePaddingLeft(snapshot.titleImagePaddingLeft)
+            setLastSavedTitleImageSize(snapshot.titleImageSize)
+            setLastSavedTitleImagePaddingTop(snapshot.titleImagePaddingTop)
+            setLastSavedTitleImagePaddingRight(snapshot.titleImagePaddingRight)
+            setLastSavedTitleImagePaddingBottom(snapshot.titleImagePaddingBottom)
+            setLastSavedTitleImagePaddingLeft(snapshot.titleImagePaddingLeft)
             setSelectedId(nextSelectedId)
             setSelectedDraft(nextLinks.find((link) => link.clientId === nextSelectedId) ?? null)
             setRemoteDraft((previous) => {
@@ -652,8 +756,36 @@ export default function LinksBuilder({
                 return previous
               }
 
-              return serializeLinks(previous.links) === serializeLinks(nextLinks) ? null : previous
+              return serializeLinks(previous.links) === serializeLinks(nextLinks) &&
+                (previous.titleImageUrl ?? '') === (snapshot.titleImageUrl ?? '')
+                && previous.titleImageSize === snapshot.titleImageSize
+                && previous.titleImagePaddingTop === snapshot.titleImagePaddingTop
+                && previous.titleImagePaddingRight === snapshot.titleImagePaddingRight
+                && previous.titleImagePaddingBottom === snapshot.titleImagePaddingBottom
+                && previous.titleImagePaddingLeft === snapshot.titleImagePaddingLeft
+                ? null
+                : previous
             })
+          })
+        }
+      )
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'links_settings' },
+        () => {
+          void fetchLinksSnapshot(supabase).then((snapshot) => {
+            setTitleImageUrl(snapshot.titleImageUrl)
+            setLastSavedTitleImageUrl(snapshot.titleImageUrl ?? '')
+            setTitleImageSize(snapshot.titleImageSize)
+            setTitleImagePaddingTop(snapshot.titleImagePaddingTop)
+            setTitleImagePaddingRight(snapshot.titleImagePaddingRight)
+            setTitleImagePaddingBottom(snapshot.titleImagePaddingBottom)
+            setTitleImagePaddingLeft(snapshot.titleImagePaddingLeft)
+            setLastSavedTitleImageSize(snapshot.titleImageSize)
+            setLastSavedTitleImagePaddingTop(snapshot.titleImagePaddingTop)
+            setLastSavedTitleImagePaddingRight(snapshot.titleImagePaddingRight)
+            setLastSavedTitleImagePaddingBottom(snapshot.titleImagePaddingBottom)
+            setLastSavedTitleImagePaddingLeft(snapshot.titleImagePaddingLeft)
           })
         }
       )
@@ -689,6 +821,12 @@ export default function LinksBuilder({
           links,
           activeId,
           editingId,
+          titleImageUrl,
+          titleImageSize,
+          titleImagePaddingTop,
+          titleImagePaddingRight,
+          titleImagePaddingBottom,
+          titleImagePaddingLeft,
         } satisfies LiveDraftPayload,
       })
     }, DRAFT_BROADCAST_DELAY_MS)
@@ -696,7 +834,20 @@ export default function LinksBuilder({
     return () => {
       window.clearTimeout(timeout)
     }
-  }, [activeId, clientId, editingId, isAdmin, links, loadState.kind])
+  }, [
+    activeId,
+    clientId,
+    editingId,
+    isAdmin,
+    links,
+    loadState.kind,
+    titleImageUrl,
+    titleImageSize,
+    titleImagePaddingTop,
+    titleImagePaddingRight,
+    titleImagePaddingBottom,
+    titleImagePaddingLeft,
+  ])
 
   function updateLink(
     clientId: string,
@@ -859,6 +1010,36 @@ export default function LinksBuilder({
     setEditingId((previous) => (previous === clientId ? null : previous))
   }
 
+  async function uploadTitleImage(file: File) {
+    const isSvg = file.type === 'image/svg+xml' || file.name.toLowerCase().endsWith('.svg')
+
+    if (!isSvg) {
+      setSaveError('Please upload an SVG file.')
+      return
+    }
+
+    setIsUploadingTitleImage(true)
+    setSaveError('')
+
+    const safeName = file.name.replace(/[^a-zA-Z0-9._-]/g, '-').toLowerCase()
+    const filePath = `links/title-images/${Date.now()}-${safeName}`
+
+    const { error: uploadError } = await supabase.storage
+      .from('media')
+      .upload(filePath, file, { upsert: false, contentType: 'image/svg+xml' })
+
+    if (uploadError) {
+      setSaveError(uploadError.message || 'Could not upload title image.')
+      setIsUploadingTitleImage(false)
+      return
+    }
+
+    const { data: publicData } = supabase.storage.from('media').getPublicUrl(filePath)
+    setTitleImageUrl(publicData.publicUrl)
+    setSaveMessage('Title image updated.')
+    setIsUploadingTitleImage(false)
+  }
+
   async function persistLinks(nextLinks: EditableLink[]) {
     setSaveMessage('')
     setSaveError('')
@@ -877,7 +1058,15 @@ export default function LinksBuilder({
         position_y: link.position_y,
         velocity_x: link.velocity_x,
         velocity_y: link.velocity_y,
-      }))
+      })),
+      {
+        titleImageUrl,
+        titleImageSize,
+        titleImagePaddingTop,
+        titleImagePaddingRight,
+        titleImagePaddingBottom,
+        titleImagePaddingLeft,
+      }
     )
 
     if (!result?.ok) {
@@ -924,6 +1113,18 @@ export default function LinksBuilder({
     setEditingId((previous) => (previous ? persistedIdByClientId.get(previous) ?? previous : previous))
     setSaveMessage(result.message || 'Saved. The links page has been updated.')
     setLastSavedFingerprint(serializeLinks(mergedLinks))
+    setLastSavedTitleImageUrl(result.titleImageUrl ?? titleImageUrl ?? '')
+    setTitleImageUrl(result.titleImageUrl ?? titleImageUrl)
+    setLastSavedTitleImageSize(result.titleImageSize ?? titleImageSize)
+    setLastSavedTitleImagePaddingTop(result.titleImagePaddingTop ?? titleImagePaddingTop)
+    setLastSavedTitleImagePaddingRight(result.titleImagePaddingRight ?? titleImagePaddingRight)
+    setLastSavedTitleImagePaddingBottom(result.titleImagePaddingBottom ?? titleImagePaddingBottom)
+    setLastSavedTitleImagePaddingLeft(result.titleImagePaddingLeft ?? titleImagePaddingLeft)
+    setTitleImageSize(result.titleImageSize ?? titleImageSize)
+    setTitleImagePaddingTop(result.titleImagePaddingTop ?? titleImagePaddingTop)
+    setTitleImagePaddingRight(result.titleImagePaddingRight ?? titleImagePaddingRight)
+    setTitleImagePaddingBottom(result.titleImagePaddingBottom ?? titleImagePaddingBottom)
+    setTitleImagePaddingLeft(result.titleImagePaddingLeft ?? titleImagePaddingLeft)
     setIsAutoSaving(false)
     return true
   }
@@ -938,7 +1139,15 @@ export default function LinksBuilder({
     }
 
     const nextFingerprint = serializeLinks(links)
-    if (nextFingerprint === lastSavedFingerprint) {
+    const titleImageUnchanged = (titleImageUrl ?? '') === lastSavedTitleImageUrl
+    const styleUnchanged =
+      titleImageSize === lastSavedTitleImageSize &&
+      titleImagePaddingTop === lastSavedTitleImagePaddingTop &&
+      titleImagePaddingRight === lastSavedTitleImagePaddingRight &&
+      titleImagePaddingBottom === lastSavedTitleImagePaddingBottom &&
+      titleImagePaddingLeft === lastSavedTitleImagePaddingLeft
+
+    if (nextFingerprint === lastSavedFingerprint && titleImageUnchanged && styleUnchanged) {
       return
     }
 
@@ -951,7 +1160,27 @@ export default function LinksBuilder({
     return () => {
       window.clearTimeout(timeout)
     }
-  }, [activeId, isAdmin, lastSavedFingerprint, links, loadState.kind, startTransition, supabase])
+  }, [
+    activeId,
+    isAdmin,
+    lastSavedFingerprint,
+    lastSavedTitleImageUrl,
+    lastSavedTitleImageSize,
+    lastSavedTitleImagePaddingTop,
+    lastSavedTitleImagePaddingRight,
+    lastSavedTitleImagePaddingBottom,
+    lastSavedTitleImagePaddingLeft,
+    links,
+    loadState.kind,
+    startTransition,
+    supabase,
+    titleImageUrl,
+    titleImageSize,
+    titleImagePaddingTop,
+    titleImagePaddingRight,
+    titleImagePaddingBottom,
+    titleImagePaddingLeft,
+  ])
 
   useEffect(() => {
     if (!saveMessage) {
@@ -976,7 +1205,23 @@ export default function LinksBuilder({
           <section className={`space-y-3 ${showAdminEditor ? 'lg:min-w-0' : ''}`}>
             <header className="border-b border-foreground/10 pb-2">
               <div className="flex flex-col items-center justify-center gap-1.5">
-                <p className="text-[10px] font-semibold uppercase tracking-[0.2em] text-foreground">PLCreative</p>
+                {displayedTitleImageUrl ? (
+                  <img
+                    src={displayedTitleImageUrl}
+                    alt="PLCreative"
+                    className="h-auto w-auto max-w-full"
+                    style={{
+                      maxHeight: '4.5rem',
+                      width: `${displayedTitleImageSize}%`,
+                      paddingTop: `${displayedTitleImagePaddingTop}px`,
+                      paddingRight: `${displayedTitleImagePaddingRight}px`,
+                      paddingBottom: `${displayedTitleImagePaddingBottom}px`,
+                      paddingLeft: `${displayedTitleImagePaddingLeft}px`,
+                    }}
+                  />
+                ) : (
+                  <p className="text-xs font-semibold uppercase tracking-[0.2em] text-foreground">PLCreative</p>
+                )}
                 {isAdmin ? (
                   <>
                     <p className="text-[10px] uppercase tracking-[0.12em] text-foreground/45">
@@ -1091,6 +1336,106 @@ export default function LinksBuilder({
                 </div>
 
                 <div className="flex-1 space-y-5 px-5 py-4 lg:max-h-[calc(100vh-9rem)] lg:overflow-y-auto">
+                  <section className="space-y-3 border border-foreground/10 p-4">
+                    <p className="text-xs uppercase tracking-[0.14em] text-foreground/55">Title image</p>
+                    <p className="text-sm text-foreground/60">
+                      Upload an SVG to replace the heading at the top.
+                    </p>
+                    <div className="flex flex-wrap items-center gap-2">
+                      <label className="cursor-pointer border border-foreground/15 px-3 py-1.5 text-[10px] font-semibold uppercase tracking-[0.14em] hover:bg-foreground/5">
+                        <input
+                          type="file"
+                          accept="image/svg+xml,.svg"
+                          className="hidden"
+                          disabled={isUploadingTitleImage}
+                          onChange={async (event) => {
+                            const input = event.currentTarget
+                            const file = event.target.files?.[0]
+                            if (!file) {
+                              return
+                            }
+
+                            await uploadTitleImage(file)
+                            input.value = ''
+                          }}
+                        />
+                        {isUploadingTitleImage ? 'Uploading…' : 'Upload SVG'}
+                      </label>
+
+                      {titleImageUrl ? (
+                        <button
+                          type="button"
+                          onClick={() => setTitleImageUrl(null)}
+                          className="border border-foreground/15 px-3 py-1.5 text-[10px] font-semibold uppercase tracking-[0.14em] hover:bg-foreground/5"
+                        >
+                          Use text
+                        </button>
+                      ) : null}
+                    </div>
+
+                    <div className="space-y-3 pt-2">
+                      <label className="grid gap-1 text-xs text-foreground/60">
+                        <span>Size ({titleImageSize}%)</span>
+                        <input
+                          type="range"
+                          min={40}
+                          max={180}
+                          step={1}
+                          value={titleImageSize}
+                          onChange={(event) => setTitleImageSize(Number(event.target.value))}
+                        />
+                      </label>
+
+                      <label className="grid gap-1 text-xs text-foreground/60">
+                        <span>Padding top ({titleImagePaddingTop}px)</span>
+                        <input
+                          type="range"
+                          min={0}
+                          max={80}
+                          step={1}
+                          value={titleImagePaddingTop}
+                          onChange={(event) => setTitleImagePaddingTop(Number(event.target.value))}
+                        />
+                      </label>
+
+                      <label className="grid gap-1 text-xs text-foreground/60">
+                        <span>Padding right ({titleImagePaddingRight}px)</span>
+                        <input
+                          type="range"
+                          min={0}
+                          max={80}
+                          step={1}
+                          value={titleImagePaddingRight}
+                          onChange={(event) => setTitleImagePaddingRight(Number(event.target.value))}
+                        />
+                      </label>
+
+                      <label className="grid gap-1 text-xs text-foreground/60">
+                        <span>Padding bottom ({titleImagePaddingBottom}px)</span>
+                        <input
+                          type="range"
+                          min={0}
+                          max={80}
+                          step={1}
+                          value={titleImagePaddingBottom}
+                          onChange={(event) => setTitleImagePaddingBottom(Number(event.target.value))}
+                        />
+                      </label>
+
+                      <label className="grid gap-1 text-xs text-foreground/60">
+                        <span>Padding left ({titleImagePaddingLeft}px)</span>
+                        <input
+                          type="range"
+                          min={0}
+                          max={80}
+                          step={1}
+                          value={titleImagePaddingLeft}
+                          onChange={(event) => setTitleImagePaddingLeft(Number(event.target.value))}
+                        />
+                      </label>
+                    </div>
+                  </section>
+
                   {loadState.kind === 'missing-table' ? (
                     <section className="space-y-2 border border-foreground/15 p-4">
                       <p className="text-sm">Links database is not set up yet.</p>

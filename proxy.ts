@@ -16,7 +16,11 @@ function withRedirectTo(url: string, redirectTo: string) {
 }
 
 export async function proxy(request: NextRequest) {
-  const host = request.headers.get('x-forwarded-host') || request.headers.get('host') || request.nextUrl.host || ''
+  const host =
+    request.headers.get('x-forwarded-host') ||
+    request.headers.get('host') ||
+    request.nextUrl.host ||
+    ''
   const protocol = request.headers.get('x-forwarded-proto') || request.nextUrl.protocol
   const subdomain = getSubdomain(host)
   const preferredDevelopmentHost = getPreferredDevelopmentHost(host)
@@ -102,6 +106,7 @@ export async function proxy(request: NextRequest) {
     const loginUrl = supportsSubdomains(host)
       ? buildSubdomainUrl({ host, protocol, subdomain: 'auth' })
       : `${protocol.replace(/:$/, '')}://${host}/login`
+
     return NextResponse.redirect(withRedirectTo(loginUrl, request.nextUrl.href))
   }
 

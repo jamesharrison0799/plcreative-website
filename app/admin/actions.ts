@@ -406,7 +406,17 @@ function normalizeLinkUrl(value: string) {
   return `https://${raw}`
 }
 
-export async function saveLinksBuilderAction(items: LinkBuilderItem[]) {
+export async function saveLinksBuilderAction(
+  items: LinkBuilderItem[],
+  settings?: {
+    titleImageUrl?: string | null
+    titleImageSize?: number | null
+    titleImagePaddingTop?: number | null
+    titleImagePaddingRight?: number | null
+    titleImagePaddingBottom?: number | null
+    titleImagePaddingLeft?: number | null
+  }
+) {
   const { supabase } = await requireAdmin()
 
   const normalized = (Array.isArray(items) ? items : [])
@@ -517,6 +527,32 @@ export async function saveLinksBuilderAction(items: LinkBuilderItem[]) {
     }
   }
 
+  const titleImageUrl =
+    typeof settings?.titleImageUrl === 'string' ? settings.titleImageUrl.trim() : ''
+  const titleImageSize = Math.max(20, Math.min(200, normalizeLinkNumber(settings?.titleImageSize, 100)))
+  const titleImagePaddingTop = Math.max(0, Math.min(120, normalizeLinkNumber(settings?.titleImagePaddingTop, 0)))
+  const titleImagePaddingRight = Math.max(0, Math.min(120, normalizeLinkNumber(settings?.titleImagePaddingRight, 0)))
+  const titleImagePaddingBottom = Math.max(0, Math.min(120, normalizeLinkNumber(settings?.titleImagePaddingBottom, 0)))
+  const titleImagePaddingLeft = Math.max(0, Math.min(120, normalizeLinkNumber(settings?.titleImagePaddingLeft, 0)))
+
+  const { error: settingsError } = await supabase.from('links_settings').upsert({
+    id: 1,
+    title_image_url: titleImageUrl || null,
+    title_image_size: titleImageSize,
+    title_image_padding_top: titleImagePaddingTop,
+    title_image_padding_right: titleImagePaddingRight,
+    title_image_padding_bottom: titleImagePaddingBottom,
+    title_image_padding_left: titleImagePaddingLeft,
+    updated_at: new Date().toISOString(),
+  })
+
+  if (settingsError && settingsError.code !== 'PGRST205') {
+    return {
+      ok: false,
+      message: 'Links saved, but title image settings could not be saved.',
+    }
+  }
+
   revalidatePath('/admin')
   revalidatePath('/admin/links')
   revalidatePath('/links')
@@ -534,10 +570,29 @@ export async function saveLinksBuilderAction(items: LinkBuilderItem[]) {
     }
   }
 
+  const { data: savedSettings } = await supabase
+    .from('links_settings')
+    .select('title_image_url, title_image_size, title_image_padding_top, title_image_padding_right, title_image_padding_bottom, title_image_padding_left')
+    .eq('id', 1)
+    .maybeSingle<{
+      title_image_url: string | null
+      title_image_size: number | null
+      title_image_padding_top: number | null
+      title_image_padding_right: number | null
+      title_image_padding_bottom: number | null
+      title_image_padding_left: number | null
+    }>()
+
   return {
     ok: true,
     message: 'Links saved.',
     links: savedLinks ?? [],
+    titleImageUrl: savedSettings?.title_image_url ?? null,
+    titleImageSize: savedSettings?.title_image_size ?? 100,
+    titleImagePaddingTop: savedSettings?.title_image_padding_top ?? 0,
+    titleImagePaddingRight: savedSettings?.title_image_padding_right ?? 0,
+    titleImagePaddingBottom: savedSettings?.title_image_padding_bottom ?? 0,
+    titleImagePaddingLeft: savedSettings?.title_image_padding_left ?? 0,
   }
 }
 

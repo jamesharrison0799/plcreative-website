@@ -2,18 +2,14 @@
 
 import { useEffect, useRef, useState } from 'react'
 import { useRouter } from 'next/navigation'
-import { createClient } from '@/lib/supabase/client'
 import { getClientAuthUrl } from '@/lib/auth-url'
+import { createClient } from '@/lib/supabase/client'
 import NextImage from 'next/image'
 
 const PREVIEW_SIZE = 320
 const OUTPUT_SIZE = 512
 const MIN_ZOOM = 1
 const MAX_ZOOM = 3
-
-function redirectToAuthLogin() {
-  window.location.assign(getClientAuthUrl('/', window.location.href))
-}
 
 interface ProfileForm {
   username: string
@@ -152,7 +148,10 @@ export default function EditProfilePage({
     const load = async () => {
       const { username } = await params
       const { data: { user } } = await supabase.auth.getUser()
-      if (!user) { redirectToAuthLogin(); return }
+      if (!user) {
+        window.location.assign(getClientAuthUrl('/', window.location.href))
+        return
+      }
 
       const { data: profile } = await supabase
         .from('profiles')
@@ -262,7 +261,7 @@ export default function EditProfilePage({
     const { data: { user } } = await supabase.auth.getUser()
 
     if (!user) {
-      redirectToAuthLogin()
+      router.push('/login')
       return
     }
 
@@ -303,7 +302,7 @@ export default function EditProfilePage({
     setError(null)
 
     const { data: { user } } = await supabase.auth.getUser()
-    if (!user) { redirectToAuthLogin(); return }
+    if (!user) { router.push('/login'); return }
 
     const { error } = await supabase
       .from('profiles')

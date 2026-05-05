@@ -22,22 +22,19 @@ export default async function AdminLayout({
 
           <nav className="mt-8 flex flex-col gap-2 text-sm">
             <Link href="/admin" className="border border-foreground/10 px-3 py-2 hover:bg-foreground/5">
-              Dashboard
+              Page Builder
             </Link>
-            <Link href="/admin/pages/home" className="border border-foreground/10 px-3 py-2 hover:bg-foreground/5">
-              Edit Home Page
+            <Link href="/admin/resend" className="border border-foreground/10 px-3 py-2 hover:bg-foreground/5">
+              Emails
             </Link>
-            <Link href="/links" className="border border-foreground/10 px-3 py-2 hover:bg-foreground/5">
+            <Link href="/admin/links" className="border border-foreground/10 px-3 py-2 hover:bg-foreground/5">
               Links
-            </Link>
-            <Link href="/admin/users" className="border border-foreground/10 px-3 py-2 hover:bg-foreground/5">
-              Users
             </Link>
             <Link href="/admin/media" className="border border-foreground/10 px-3 py-2 hover:bg-foreground/5">
               Media
             </Link>
-            <Link href="/admin/resend" className="border border-foreground/10 px-3 py-2 hover:bg-foreground/5">
-              Resend
+            <Link href="/admin/users" className="border border-foreground/10 px-3 py-2 hover:bg-foreground/5">
+              Users
             </Link>
           </nav>
         </aside>

@@ -78,7 +78,7 @@ export default async function AdminPage() {
             <p className="mt-2 text-xs text-foreground/50">Manage and view your links page</p>
             <div className="mt-3 flex gap-2">
               <Link
-                href="/links"
+                href="/admin/links"
                 className="flex-1 border border-foreground/10 px-4 py-2 text-sm text-center hover:bg-foreground/5"
               >
                 Manage
