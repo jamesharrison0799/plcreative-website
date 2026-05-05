@@ -1,5 +1,5 @@
 import { redirect } from 'next/navigation'
-import { getAuthUrl } from '@/lib/auth-url'
+import { getAuthUrl } from '@/lib/auth-url.server'
 import { createClient } from '@/lib/supabase/server'
 
 export async function requireAdmin() {

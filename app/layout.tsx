@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
 import AuthControls from "@/components/AuthControls";
-import { getAuthUrl } from "@/lib/auth-url";
+import { getAuthUrl } from "@/lib/auth-url.server";
 import { createClient } from "@/lib/supabase/server";
 
 const geistSans = Geist({
@@ -42,7 +42,7 @@ export default async function RootLayout({
       className={`${geistSans.variable} ${geistMono.variable} h-full antialiased`}
     >
       <body className="min-h-full flex flex-col">
-        <header className="fixed top-0 right-0 z-[100] p-4 pointer-events-auto">
+        <header className="relative z-[100] pointer-events-auto">
           <AuthControls loginHref={loginHref} />
         </header>
         {children}

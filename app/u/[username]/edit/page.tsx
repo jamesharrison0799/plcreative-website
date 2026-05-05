@@ -12,7 +12,7 @@ const MIN_ZOOM = 1
 const MAX_ZOOM = 3
 
 function redirectToAuthLogin() {
-  window.location.assign(getClientAuthUrl())
+  window.location.assign(getClientAuthUrl('/', window.location.href))
 }
 
 interface ProfileForm {

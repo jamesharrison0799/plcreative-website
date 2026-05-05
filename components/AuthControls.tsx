@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useState } from 'react'
 import { useRouter } from 'next/navigation'
+import { getClientAuthUrl } from '@/lib/auth-url'
 import { createClient } from '@/lib/supabase/client'
 import type { User } from '@supabase/supabase-js'
 
@@ -29,21 +30,34 @@ export default function AuthControls({ loginHref }: { loginHref: string }) {
 
   if (user) {
     return (
-      <button
-        onClick={handleLogout}
-        className="text-xs text-gray-500 hover:text-gray-800 transition-colors"
-      >
-        Logout
-      </button>
+      <div className="border-b border-foreground/10 bg-background/95 backdrop-blur-sm">
+        <div className="flex items-center justify-between gap-4 px-4 py-3 text-xs sm:px-6">
+          <p className="min-w-0 text-foreground/70">
+            Logged in as <span className="font-medium text-foreground">{user.email ?? 'authenticated user'}</span>
+          </p>
+          <button
+            onClick={handleLogout}
+            className="shrink-0 text-foreground/60 transition-colors hover:text-foreground"
+          >
+            Logout
+          </button>
+        </div>
+      </div>
     )
   }
 
   return (
-    <a
-      href={loginHref}
-      className="text-xs text-gray-500 hover:text-gray-800 transition-colors"
-    >
-      Login
-    </a>
+    <div className="flex justify-end px-4 py-4 sm:px-6">
+      <a
+        href={loginHref}
+        onClick={(event) => {
+          event.preventDefault()
+          window.location.assign(getClientAuthUrl('/', window.location.href))
+        }}
+        className="text-xs text-gray-500 transition-colors hover:text-gray-800"
+      >
+        Login
+      </a>
+    </div>
   )
 }

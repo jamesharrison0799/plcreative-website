@@ -1,11 +1,28 @@
 import { createServerClient } from '@supabase/ssr'
 import { NextResponse, type NextRequest } from 'next/server'
-import { buildSubdomainUrl, getSubdomain } from '@/lib/subdomains'
+import { buildRootDomainUrl, buildSubdomainUrl, getSubdomain } from '@/lib/subdomains'
+import { getSupabaseCookieOptions } from '@/lib/supabase/cookie-options'
+
+function withRedirectTo(url: string, redirectTo: string) {
+  const nextUrl = new URL(url)
+  nextUrl.searchParams.set('redirectTo', redirectTo)
+  return nextUrl
+}
 
 export async function proxy(request: NextRequest) {
   const host = request.headers.get('x-forwarded-host') || request.headers.get('host') || request.nextUrl.host || ''
   const protocol = request.headers.get('x-forwarded-proto') || request.nextUrl.protocol
   const subdomain = getSubdomain(host)
+
+  if (request.nextUrl.pathname.startsWith('/admin') && subdomain) {
+    return NextResponse.redirect(
+      buildRootDomainUrl({
+        host,
+        protocol,
+        pathname: `${request.nextUrl.pathname}${request.nextUrl.search}`,
+      })
+    )
+  }
 
   if (request.nextUrl.pathname === '/login' && subdomain !== 'auth') {
     return NextResponse.redirect(
@@ -47,6 +64,7 @@ export async function proxy(request: NextRequest) {
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
     process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
     {
+      cookieOptions: getSupabaseCookieOptions(host, protocol),
       cookies: {
         getAll() {
           return request.cookies.getAll()
@@ -68,11 +86,14 @@ export async function proxy(request: NextRequest) {
 
   if (!user && (request.nextUrl.pathname.startsWith('/admin') || request.nextUrl.pathname.endsWith('/edit'))) {
     return NextResponse.redirect(
-      buildSubdomainUrl({
-        host,
-        protocol,
-        subdomain: 'auth',
-      })
+      withRedirectTo(
+        buildSubdomainUrl({
+          host,
+          protocol,
+          subdomain: 'auth',
+        }),
+        request.nextUrl.href
+      )
     )
   }
 

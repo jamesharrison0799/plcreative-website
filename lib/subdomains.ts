@@ -27,6 +27,11 @@ function getRootDomain(hostname: string) {
   return parts.slice(-2).join('.')
 }
 
+export function getRootDomainForHost(host: string) {
+  const { hostname } = splitHost(host)
+  return getRootDomain(hostname)
+}
+
 export function getSubdomain(host: string) {
   const { hostname } = splitHost(host)
 
@@ -68,5 +73,27 @@ export function buildSubdomainUrl({
       ? `${subdomain}.localhost${port ? `:${port}` : ''}`
       : `${subdomain}.${rootDomain}${port ? `:${port}` : ''}`
 
+  return `${normalizedProtocol}://${targetHost}${normalizedPath}`
+}
+
+export function buildRootDomainUrl({
+  host,
+  protocol,
+  pathname = '/',
+}: {
+  host: string
+  protocol: string
+  pathname?: string
+}) {
+  const { hostname, port } = splitHost(host)
+  const normalizedPath = pathname.startsWith('/') ? pathname : `/${pathname}`
+  const normalizedProtocol = protocol.replace(/:$/, '') || 'https'
+  const rootDomain = getRootDomain(hostname)
+
+  if (!rootDomain) {
+    return normalizedPath
+  }
+
+  const targetHost = `${rootDomain}${port ? `:${port}` : ''}`
   return `${normalizedProtocol}://${targetHost}${normalizedPath}`
 }

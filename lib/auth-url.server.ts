@@ -1,3 +1,4 @@
+import { headers } from 'next/headers'
 import { buildSubdomainUrl } from '@/lib/subdomains'
 
 function addRedirectTo(url: string, redirectTo?: string) {
@@ -10,11 +11,15 @@ function addRedirectTo(url: string, redirectTo?: string) {
   return nextUrl.toString()
 }
 
-export function getClientAuthUrl(pathname = '/', redirectTo?: string) {
+export async function getAuthUrl(pathname = '/', redirectTo?: string) {
+  const headerStore = await headers()
+  const host = headerStore.get('x-forwarded-host') || headerStore.get('host') || ''
+  const protocol = headerStore.get('x-forwarded-proto') || 'https'
+
   return addRedirectTo(
     buildSubdomainUrl({
-      host: window.location.host,
-      protocol: window.location.protocol,
+      host,
+      protocol,
       subdomain: 'auth',
       pathname,
     }),
