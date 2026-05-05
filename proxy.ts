@@ -43,6 +43,12 @@ export async function proxy(request: NextRequest) {
     return NextResponse.rewrite(url)
   }
 
+  if (subdomain === 'bin' && !request.nextUrl.pathname.startsWith('/bin')) {
+    const url = request.nextUrl.clone()
+    url.pathname = `/bin${url.pathname}`
+    return NextResponse.rewrite(url)
+  }
+
   let supabaseResponse = NextResponse.next({ request })
 
   const supabase = createServerClient(
