@@ -1,4 +1,5 @@
 import { redirect } from 'next/navigation'
+import { getAuthUrl } from '@/lib/auth-url'
 import { createClient } from '@/lib/supabase/server'
 
 export async function requireAdmin() {
@@ -8,7 +9,7 @@ export async function requireAdmin() {
   } = await supabase.auth.getUser()
 
   if (!user) {
-    redirect('/login')
+    redirect(await getAuthUrl())
   }
 
   const { data: profile } = await supabase

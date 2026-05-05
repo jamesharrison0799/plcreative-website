@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
 import AuthControls from "@/components/AuthControls";
+import { getAuthUrl } from "@/lib/auth-url";
 import { createClient } from "@/lib/supabase/server";
 
 const geistSans = Geist({
@@ -28,11 +29,13 @@ export async function generateMetadata(): Promise<Metadata> {
   }
 }
 
-export default function RootLayout({
+export default async function RootLayout({
   children,
 }: Readonly<{
   children: React.ReactNode;
 }>) {
+  const loginHref = await getAuthUrl()
+
   return (
     <html
       lang="en"
@@ -40,7 +43,7 @@ export default function RootLayout({
     >
       <body className="min-h-full flex flex-col">
         <header className="fixed top-0 right-0 z-[100] p-4 pointer-events-auto">
-          <AuthControls />
+          <AuthControls loginHref={loginHref} />
         </header>
         {children}
       </body>

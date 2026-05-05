@@ -4,9 +4,8 @@ import { useEffect, useMemo, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 import type { User } from '@supabase/supabase-js'
-import Link from 'next/link'
 
-export default function AuthControls() {
+export default function AuthControls({ loginHref }: { loginHref: string }) {
   const [user, setUser] = useState<User | null>(null)
   const router = useRouter()
   const supabase = useMemo(() => createClient(), [])
@@ -40,11 +39,11 @@ export default function AuthControls() {
   }
 
   return (
-    <Link
-      href="/login"
+    <a
+      href={loginHref}
       className="text-xs text-gray-500 hover:text-gray-800 transition-colors"
     >
       Login
-    </Link>
+    </a>
   )
 }
